@@ -58,8 +58,12 @@ const params = {
   scaleMax: 1.25,
   twistMin: -15,
   twistMax: 55,
+  twistAxis: "y",
   twistCurve: "smoothstep",
   scaleCurve: "smoothstep",
+  bendAmount: 6,
+  bendDirection: 0,
+  bendCurve: "smoothstep",
   colorBottom: "#2aa4ff",
   colorTop: "#ff7b57",
   roughness: 0.45,
@@ -70,6 +74,12 @@ const curveOptions = {
   linear: "linear",
   smoothstep: "smoothstep",
   easeInOutCubic: "easeInOutCubic",
+};
+
+const axisOptions = {
+  x: "x",
+  y: "y",
+  z: "z",
 };
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -114,6 +124,12 @@ const rebuildTower = () => {
 
     const twist = lerp(params.twistMin, params.twistMax, twistT);
     const scale = lerp(params.scaleMin, params.scaleMax, scaleT);
+    const bendT = applyCurve(t, params.bendCurve);
+
+    const bendDistance = params.bendAmount * bendT;
+    const bendAngleRad = THREE.MathUtils.degToRad(params.bendDirection);
+    const bendX = Math.cos(bendAngleRad) * bendDistance;
+    const bendZ = Math.sin(bendAngleRad) * bendDistance;
 
     const color = new THREE.Color(params.colorBottom).lerp(
       new THREE.Color(params.colorTop),
@@ -136,8 +152,15 @@ const rebuildTower = () => {
       params.slabDepth * scale
     );
 
-    slab.position.set(0, i * params.floorHeight - baseY, 0);
-    slab.rotation.y = THREE.MathUtils.degToRad(twist);
+    slab.position.set(bendX, i * params.floorHeight - baseY, bendZ);
+
+    if (params.twistAxis === "x") {
+      slab.rotation.x = THREE.MathUtils.degToRad(twist);
+    } else if (params.twistAxis === "z") {
+      slab.rotation.z = THREE.MathUtils.degToRad(twist);
+    } else {
+      slab.rotation.y = THREE.MathUtils.degToRad(twist);
+    }
 
     towerGroup.add(slab);
   }
@@ -159,6 +182,7 @@ layoutFolder
 const twistFolder = gui.addFolder("Twist Gradient");
 twistFolder.add(params, "twistMin", -180, 180, 1).onChange(rebuildTower);
 twistFolder.add(params, "twistMax", -180, 180, 1).onChange(rebuildTower);
+twistFolder.add(params, "twistAxis", axisOptions).onChange(rebuildTower);
 twistFolder
   .add(params, "twistCurve", curveOptions)
   .onChange(rebuildTower);
@@ -169,6 +193,11 @@ scaleFolder.add(params, "scaleMax", 0.2, 2, 0.01).onChange(rebuildTower);
 scaleFolder
   .add(params, "scaleCurve", curveOptions)
   .onChange(rebuildTower);
+
+const bendFolder = gui.addFolder("Bend");
+bendFolder.add(params, "bendAmount", 0, 20, 0.1).onChange(rebuildTower);
+bendFolder.add(params, "bendDirection", -180, 180, 1).onChange(rebuildTower);
+bendFolder.add(params, "bendCurve", curveOptions).onChange(rebuildTower);
 
 const colorFolder = gui.addFolder("Color");
 colorFolder.addColor(params, "colorBottom").onChange(rebuildTower);
