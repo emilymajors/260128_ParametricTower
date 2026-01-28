@@ -167,9 +167,6 @@ const rebuildTower = () => {
   disposeTower();
 
   const floors = Math.max(1, Math.floor(params.floors));
-  const height = (floors - 1) * params.floorHeight;
-  const baseY = height * 0.5;
-
   for (let i = 0; i < floors; i += 1) {
     const t = floors === 1 ? 0 : i / (floors - 1);
     const twistXT = applyCurve(t, params.twistXCurve);
@@ -188,11 +185,28 @@ const rebuildTower = () => {
     const radius =
       Math.abs(totalAngle) < 1e-4 ? 0 : totalHeight / totalAngle;
     const angle = totalAngle * bendT;
-    const horizontal = radius === 0 ? 0 : radius * (1 - Math.cos(angle));
-    const vertical = radius === 0 ? 0 : radius * Math.sin(angle);
-    const heightSpan = radius === 0 ? 0 : radius * Math.sin(totalAngle);
-    const bendX = Math.cos(bendYaw) * horizontal;
-    const bendZ = Math.sin(bendYaw) * horizontal;
+
+    let localX = 0;
+    let localY = t * totalHeight;
+    let tangent = new THREE.Vector3(0, 1, 0);
+
+    if (radius !== 0) {
+      localX = radius * (1 - Math.cos(angle));
+      localY = radius * Math.sin(angle);
+      tangent = new THREE.Vector3(
+        Math.sin(angle),
+        Math.cos(angle),
+        0
+      ).normalize();
+    }
+
+    const endX = radius === 0 ? 0 : radius * (1 - Math.cos(totalAngle));
+    const endY = radius === 0 ? totalHeight : radius * Math.sin(totalAngle);
+    const offset = new THREE.Vector3(endX * 0.5, endY * 0.5, 0);
+    const localPos = new THREE.Vector3(localX, localY, 0).sub(offset);
+    localPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), bendYaw);
+    const bendX = localPos.x;
+    const bendZ = localPos.z;
 
     const color = new THREE.Color(params.colorBottom).lerp(
       new THREE.Color(params.colorTop),
@@ -212,18 +226,20 @@ const rebuildTower = () => {
 
     slab.scale.set(scale, 1, scale);
 
-    const straightY = i * params.floorHeight - baseY;
-    const curvedY = vertical - heightSpan * 0.5;
-    slab.position.set(bendX, straightY + curvedY, bendZ);
+    slab.position.set(bendX, localPos.y, bendZ);
 
-    const bendPitch = radius === 0 ? 0 : angle;
-    slab.rotation.x = THREE.MathUtils.degToRad(twistX);
-    slab.rotation.y = THREE.MathUtils.degToRad(twistY);
-    slab.rotation.z = THREE.MathUtils.degToRad(twistZ);
-    slab.rotateOnAxis(
-      new THREE.Vector3(Math.sin(bendYaw), 0, -Math.cos(bendYaw)),
-      bendPitch
+    const twistEuler = new THREE.Euler(
+      THREE.MathUtils.degToRad(twistX),
+      THREE.MathUtils.degToRad(twistY),
+      THREE.MathUtils.degToRad(twistZ),
+      "XYZ"
     );
+    const twistQuat = new THREE.Quaternion().setFromEuler(twistEuler);
+    const bendQuat = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      tangent.applyAxisAngle(new THREE.Vector3(0, 1, 0), bendYaw)
+    );
+    slab.quaternion.copy(bendQuat).multiply(twistQuat);
 
     towerGroup.add(slab);
   }
@@ -325,7 +341,7 @@ makeReset(scaleFolder, ["scaleMin", "scaleMax", "scaleCurve"], scaleControllers)
 
 const bendFolder = gui.addFolder("Bend");
 const bendControllers = [
-  addControl(bendFolder, "bendAngle", -120, 120, 1),
+  addControl(bendFolder, "bendAngle", -180, 180, 1),
   addControl(bendFolder, "bendDirection", -180, 180, 1),
   addControl(bendFolder, "bendCurve", curveOptions),
 ];
