@@ -1,0 +1,22 @@
+{
+    "name":  "260128_ParametricTower",
+    "version":  "1.0.0",
+    "description":  "",
+    "main":  "index.js",
+    "scripts":  {
+                    "dev":  "http-server . -c-1 -p 5173",
+                    "start":  "http-server . -c-1 -p 5173"
+                },
+    "keywords":  [
+
+                 ],
+    "author":  "",
+    "license":  "ISC",
+    "dependencies":  {
+                         "lil-gui":  "^0.21.0",
+                         "three":  "^0.182.0"
+                     },
+    "devDependencies":  {
+                            "http-server":  "^14.1.1"
+                        }
+}
