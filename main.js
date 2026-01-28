@@ -69,7 +69,7 @@ const params = {
   twistZMax: 0,
   twistZCurve: "smoothstep",
   scaleCurve: "smoothstep",
-  bendAmount: 6,
+  bendAngle: 25,
   bendDirection: 0,
   bendCurve: "smoothstep",
   colorBottom: "#2aa4ff",
@@ -182,11 +182,17 @@ const rebuildTower = () => {
     const twistZ = lerp(params.twistZMin, params.twistZMax, twistZT);
     const scale = lerp(params.scaleMin, params.scaleMax, scaleT);
     const bendT = applyCurve(t, params.bendCurve);
-
-    const bendDistance = params.bendAmount * bendT;
-    const bendAngleRad = THREE.MathUtils.degToRad(params.bendDirection);
-    const bendX = Math.cos(bendAngleRad) * bendDistance;
-    const bendZ = Math.sin(bendAngleRad) * bendDistance;
+    const totalAngle = THREE.MathUtils.degToRad(params.bendAngle);
+    const bendYaw = THREE.MathUtils.degToRad(params.bendDirection);
+    const totalHeight = (floors - 1) * params.floorHeight || 1;
+    const radius =
+      Math.abs(totalAngle) < 1e-4 ? 0 : totalHeight / totalAngle;
+    const angle = totalAngle * bendT;
+    const horizontal = radius === 0 ? 0 : radius * (1 - Math.cos(angle));
+    const vertical = radius === 0 ? 0 : radius * Math.sin(angle);
+    const heightSpan = radius === 0 ? 0 : radius * Math.sin(totalAngle);
+    const bendX = Math.cos(bendYaw) * horizontal;
+    const bendZ = Math.sin(bendYaw) * horizontal;
 
     const color = new THREE.Color(params.colorBottom).lerp(
       new THREE.Color(params.colorTop),
@@ -206,11 +212,18 @@ const rebuildTower = () => {
 
     slab.scale.set(scale, 1, scale);
 
-    slab.position.set(bendX, i * params.floorHeight - baseY, bendZ);
+    const straightY = i * params.floorHeight - baseY;
+    const curvedY = vertical - heightSpan * 0.5;
+    slab.position.set(bendX, straightY + curvedY, bendZ);
 
+    const bendPitch = radius === 0 ? 0 : angle;
     slab.rotation.x = THREE.MathUtils.degToRad(twistX);
     slab.rotation.y = THREE.MathUtils.degToRad(twistY);
     slab.rotation.z = THREE.MathUtils.degToRad(twistZ);
+    slab.rotateOnAxis(
+      new THREE.Vector3(Math.sin(bendYaw), 0, -Math.cos(bendYaw)),
+      bendPitch
+    );
 
     towerGroup.add(slab);
   }
@@ -220,54 +233,117 @@ const gui = new GUI({ width: 300 });
 
 gui.title("Tower Controls");
 
+const defaults = structuredClone(params);
+
+const makeReset = (folder, keys, controllers) => {
+  const controllerMap = new Map(
+    controllers.map((controller) => [controller._key, controller])
+  );
+
+  folder.add(
+    {
+      reset: () => {
+        keys.forEach((key) => {
+          params[key] = defaults[key];
+          const controller = controllerMap.get(key);
+          if (controller) controller.setValue(params[key]);
+        });
+        rebuildTower();
+      },
+    },
+    "reset"
+  );
+};
+
+const addControl = (folder, key, ...args) => {
+  const controller = folder.add(params, key, ...args).onChange(rebuildTower);
+  controller._key = key;
+  return controller;
+};
+
+const addColorControl = (folder, key) => {
+  const controller = folder.addColor(params, key).onChange(rebuildTower);
+  controller._key = key;
+  return controller;
+};
+
 const layoutFolder = gui.addFolder("Layout");
-layoutFolder.add(params, "floors", 1, 200, 1).onChange(rebuildTower);
-layoutFolder.add(params, "floorHeight", 0.2, 2, 0.01).onChange(rebuildTower);
-layoutFolder.add(params, "slabWidth", 2, 20, 0.1).onChange(rebuildTower);
-layoutFolder.add(params, "slabDepth", 2, 20, 0.1).onChange(rebuildTower);
-layoutFolder
-  .add(params, "slabThickness", 0.1, 1.2, 0.01)
-  .onChange(rebuildTower);
+const layoutControllers = [
+  addControl(layoutFolder, "floors", 1, 200, 1),
+  addControl(layoutFolder, "floorHeight", 0.2, 2, 0.01),
+  addControl(layoutFolder, "slabWidth", 2, 20, 0.1),
+  addControl(layoutFolder, "slabDepth", 2, 20, 0.1),
+  addControl(layoutFolder, "slabThickness", 0.1, 1.2, 0.01),
+];
+makeReset(layoutFolder, [
+  "floors",
+  "floorHeight",
+  "slabWidth",
+  "slabDepth",
+  "slabThickness",
+], layoutControllers);
 
 const shapeFolder = gui.addFolder("Shape Gradient");
-shapeFolder.add(params, "shapeBottom", shapeOptions).onChange(rebuildTower);
-shapeFolder.add(params, "shapeTop", shapeOptions).onChange(rebuildTower);
-shapeFolder.add(params, "shapeCurve", curveOptions).onChange(rebuildTower);
+const shapeControllers = [
+  addControl(shapeFolder, "shapeBottom", shapeOptions),
+  addControl(shapeFolder, "shapeTop", shapeOptions),
+  addControl(shapeFolder, "shapeCurve", curveOptions),
+];
+makeReset(shapeFolder, ["shapeBottom", "shapeTop", "shapeCurve"], shapeControllers);
 
 const twistXFolder = gui.addFolder("Twist X");
-twistXFolder.add(params, "twistXMin", -180, 180, 1).onChange(rebuildTower);
-twistXFolder.add(params, "twistXMax", -180, 180, 1).onChange(rebuildTower);
-twistXFolder.add(params, "twistXCurve", curveOptions).onChange(rebuildTower);
+const twistXControllers = [
+  addControl(twistXFolder, "twistXMin", -180, 180, 1),
+  addControl(twistXFolder, "twistXMax", -180, 180, 1),
+  addControl(twistXFolder, "twistXCurve", curveOptions),
+];
+makeReset(twistXFolder, ["twistXMin", "twistXMax", "twistXCurve"], twistXControllers);
 
 const twistYFolder = gui.addFolder("Twist Y");
-twistYFolder.add(params, "twistYMin", -180, 180, 1).onChange(rebuildTower);
-twistYFolder.add(params, "twistYMax", -180, 180, 1).onChange(rebuildTower);
-twistYFolder.add(params, "twistYCurve", curveOptions).onChange(rebuildTower);
+const twistYControllers = [
+  addControl(twistYFolder, "twistYMin", -180, 180, 1),
+  addControl(twistYFolder, "twistYMax", -180, 180, 1),
+  addControl(twistYFolder, "twistYCurve", curveOptions),
+];
+makeReset(twistYFolder, ["twistYMin", "twistYMax", "twistYCurve"], twistYControllers);
 
 const twistZFolder = gui.addFolder("Twist Z");
-twistZFolder.add(params, "twistZMin", -180, 180, 1).onChange(rebuildTower);
-twistZFolder.add(params, "twistZMax", -180, 180, 1).onChange(rebuildTower);
-twistZFolder.add(params, "twistZCurve", curveOptions).onChange(rebuildTower);
+const twistZControllers = [
+  addControl(twistZFolder, "twistZMin", -180, 180, 1),
+  addControl(twistZFolder, "twistZMax", -180, 180, 1),
+  addControl(twistZFolder, "twistZCurve", curveOptions),
+];
+makeReset(twistZFolder, ["twistZMin", "twistZMax", "twistZCurve"], twistZControllers);
 
 const scaleFolder = gui.addFolder("Scale Gradient");
-scaleFolder.add(params, "scaleMin", 0.2, 2, 0.01).onChange(rebuildTower);
-scaleFolder.add(params, "scaleMax", 0.2, 2, 0.01).onChange(rebuildTower);
-scaleFolder
-  .add(params, "scaleCurve", curveOptions)
-  .onChange(rebuildTower);
+const scaleControllers = [
+  addControl(scaleFolder, "scaleMin", 0.2, 2, 0.01),
+  addControl(scaleFolder, "scaleMax", 0.2, 2, 0.01),
+  addControl(scaleFolder, "scaleCurve", curveOptions),
+];
+makeReset(scaleFolder, ["scaleMin", "scaleMax", "scaleCurve"], scaleControllers);
 
 const bendFolder = gui.addFolder("Bend");
-bendFolder.add(params, "bendAmount", 0, 20, 0.1).onChange(rebuildTower);
-bendFolder.add(params, "bendDirection", -180, 180, 1).onChange(rebuildTower);
-bendFolder.add(params, "bendCurve", curveOptions).onChange(rebuildTower);
+const bendControllers = [
+  addControl(bendFolder, "bendAngle", -120, 120, 1),
+  addControl(bendFolder, "bendDirection", -180, 180, 1),
+  addControl(bendFolder, "bendCurve", curveOptions),
+];
+makeReset(bendFolder, ["bendAngle", "bendDirection", "bendCurve"], bendControllers);
 
 const colorFolder = gui.addFolder("Color");
-colorFolder.addColor(params, "colorBottom").onChange(rebuildTower);
-colorFolder.addColor(params, "colorTop").onChange(rebuildTower);
+const colorControllers = [
+  addColorControl(colorFolder, "colorBottom"),
+  addColorControl(colorFolder, "colorTop"),
+];
+makeReset(colorFolder, ["colorBottom", "colorTop"], colorControllers);
 
 const materialFolder = gui.addFolder("Material");
-materialFolder.add(params, "roughness", 0, 1, 0.01).onChange(rebuildTower);
-materialFolder.add(params, "metalness", 0, 1, 0.01).onChange(rebuildTower);
+const materialControllers = [
+  addControl(materialFolder, "roughness", 0, 1, 0.01),
+  addControl(materialFolder, "metalness", 0, 1, 0.01),
+];
+makeReset(materialFolder, ["roughness", "metalness"], materialControllers);
 
 rebuildTower();
 
