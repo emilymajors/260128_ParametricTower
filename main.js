@@ -54,6 +54,9 @@ const params = {
   slabWidth: 8,
   slabDepth: 8,
   slabThickness: 0.4,
+  shapeBottom: "square",
+  shapeTop: "circle",
+  shapeCurve: "smoothstep",
   scaleMin: 0.65,
   scaleMax: 1.25,
   twistMin: -15,
@@ -74,6 +77,12 @@ const curveOptions = {
   linear: "linear",
   smoothstep: "smoothstep",
   easeInOutCubic: "easeInOutCubic",
+};
+
+const shapeOptions = {
+  square: "square",
+  circle: "circle",
+  triangle: "triangle",
 };
 
 const axisOptions = {
@@ -99,7 +108,51 @@ const applyCurve = (t, type) => {
   }
 };
 
-const slabGeometry = new THREE.BoxGeometry(1, 1, 1, 1, 1, 1);
+const polarRadiusForShape = (type, theta) => {
+  const angle = THREE.MathUtils.euclideanModulo(theta, Math.PI * 2);
+  const polygonRadius = (sides) => {
+    const slice = (Math.PI * 2) / sides;
+    const inner = THREE.MathUtils.euclideanModulo(angle, slice);
+    return Math.cos(Math.PI / sides) / Math.cos(inner - Math.PI / sides);
+  };
+
+  switch (type) {
+    case "triangle":
+      return polygonRadius(3);
+    case "square":
+      return polygonRadius(4);
+    case "circle":
+    default:
+      return 1;
+  }
+};
+
+const createSlabGeometry = (t) => {
+  const shapeT = applyCurve(t, params.shapeCurve);
+  const segments = 64;
+  const points = [];
+
+  for (let i = 0; i < segments; i += 1) {
+    const theta = (i / segments) * Math.PI * 2;
+    const rBottom = polarRadiusForShape(params.shapeBottom, theta);
+    const rTop = polarRadiusForShape(params.shapeTop, theta);
+    const r = lerp(rBottom, rTop, shapeT);
+    const x = Math.cos(theta) * r * 0.5 * params.slabWidth;
+    const y = Math.sin(theta) * r * 0.5 * params.slabDepth;
+    points.push(new THREE.Vector2(x, y));
+  }
+
+  const shape = new THREE.Shape(points);
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: params.slabThickness,
+    bevelEnabled: false,
+    curveSegments: segments,
+  });
+
+  geometry.rotateX(-Math.PI / 2);
+  geometry.translate(0, params.slabThickness * 0.5, 0);
+  return geometry;
+};
 
 const disposeTower = () => {
   while (towerGroup.children.length > 0) {
@@ -142,15 +195,12 @@ const rebuildTower = () => {
       metalness: params.metalness,
     });
 
+    const slabGeometry = createSlabGeometry(t);
     const slab = new THREE.Mesh(slabGeometry, material);
     slab.castShadow = true;
     slab.receiveShadow = true;
 
-    slab.scale.set(
-      params.slabWidth * scale,
-      params.slabThickness,
-      params.slabDepth * scale
-    );
+    slab.scale.set(scale, 1, scale);
 
     slab.position.set(bendX, i * params.floorHeight - baseY, bendZ);
 
@@ -178,6 +228,11 @@ layoutFolder.add(params, "slabDepth", 2, 20, 0.1).onChange(rebuildTower);
 layoutFolder
   .add(params, "slabThickness", 0.1, 1.2, 0.01)
   .onChange(rebuildTower);
+
+const shapeFolder = gui.addFolder("Shape Gradient");
+shapeFolder.add(params, "shapeBottom", shapeOptions).onChange(rebuildTower);
+shapeFolder.add(params, "shapeTop", shapeOptions).onChange(rebuildTower);
+shapeFolder.add(params, "shapeCurve", curveOptions).onChange(rebuildTower);
 
 const twistFolder = gui.addFolder("Twist Gradient");
 twistFolder.add(params, "twistMin", -180, 180, 1).onChange(rebuildTower);
