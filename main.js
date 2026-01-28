@@ -59,10 +59,15 @@ const params = {
   shapeCurve: "smoothstep",
   scaleMin: 0.65,
   scaleMax: 1.25,
-  twistMin: -15,
-  twistMax: 55,
-  twistAxis: "y",
-  twistCurve: "smoothstep",
+  twistXMin: 0,
+  twistXMax: 0,
+  twistXCurve: "smoothstep",
+  twistYMin: -15,
+  twistYMax: 55,
+  twistYCurve: "smoothstep",
+  twistZMin: 0,
+  twistZMax: 0,
+  twistZCurve: "smoothstep",
   scaleCurve: "smoothstep",
   bendAmount: 6,
   bendDirection: 0,
@@ -85,11 +90,6 @@ const shapeOptions = {
   triangle: "triangle",
 };
 
-const axisOptions = {
-  x: "x",
-  y: "y",
-  z: "z",
-};
 
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -172,10 +172,14 @@ const rebuildTower = () => {
 
   for (let i = 0; i < floors; i += 1) {
     const t = floors === 1 ? 0 : i / (floors - 1);
-    const twistT = applyCurve(t, params.twistCurve);
+    const twistXT = applyCurve(t, params.twistXCurve);
+    const twistYT = applyCurve(t, params.twistYCurve);
+    const twistZT = applyCurve(t, params.twistZCurve);
     const scaleT = applyCurve(t, params.scaleCurve);
 
-    const twist = lerp(params.twistMin, params.twistMax, twistT);
+    const twistX = lerp(params.twistXMin, params.twistXMax, twistXT);
+    const twistY = lerp(params.twistYMin, params.twistYMax, twistYT);
+    const twistZ = lerp(params.twistZMin, params.twistZMax, twistZT);
     const scale = lerp(params.scaleMin, params.scaleMax, scaleT);
     const bendT = applyCurve(t, params.bendCurve);
 
@@ -204,13 +208,9 @@ const rebuildTower = () => {
 
     slab.position.set(bendX, i * params.floorHeight - baseY, bendZ);
 
-    if (params.twistAxis === "x") {
-      slab.rotation.x = THREE.MathUtils.degToRad(twist);
-    } else if (params.twistAxis === "z") {
-      slab.rotation.z = THREE.MathUtils.degToRad(twist);
-    } else {
-      slab.rotation.y = THREE.MathUtils.degToRad(twist);
-    }
+    slab.rotation.x = THREE.MathUtils.degToRad(twistX);
+    slab.rotation.y = THREE.MathUtils.degToRad(twistY);
+    slab.rotation.z = THREE.MathUtils.degToRad(twistZ);
 
     towerGroup.add(slab);
   }
@@ -234,13 +234,20 @@ shapeFolder.add(params, "shapeBottom", shapeOptions).onChange(rebuildTower);
 shapeFolder.add(params, "shapeTop", shapeOptions).onChange(rebuildTower);
 shapeFolder.add(params, "shapeCurve", curveOptions).onChange(rebuildTower);
 
-const twistFolder = gui.addFolder("Twist Gradient");
-twistFolder.add(params, "twistMin", -180, 180, 1).onChange(rebuildTower);
-twistFolder.add(params, "twistMax", -180, 180, 1).onChange(rebuildTower);
-twistFolder.add(params, "twistAxis", axisOptions).onChange(rebuildTower);
-twistFolder
-  .add(params, "twistCurve", curveOptions)
-  .onChange(rebuildTower);
+const twistXFolder = gui.addFolder("Twist X");
+twistXFolder.add(params, "twistXMin", -180, 180, 1).onChange(rebuildTower);
+twistXFolder.add(params, "twistXMax", -180, 180, 1).onChange(rebuildTower);
+twistXFolder.add(params, "twistXCurve", curveOptions).onChange(rebuildTower);
+
+const twistYFolder = gui.addFolder("Twist Y");
+twistYFolder.add(params, "twistYMin", -180, 180, 1).onChange(rebuildTower);
+twistYFolder.add(params, "twistYMax", -180, 180, 1).onChange(rebuildTower);
+twistYFolder.add(params, "twistYCurve", curveOptions).onChange(rebuildTower);
+
+const twistZFolder = gui.addFolder("Twist Z");
+twistZFolder.add(params, "twistZMin", -180, 180, 1).onChange(rebuildTower);
+twistZFolder.add(params, "twistZMax", -180, 180, 1).onChange(rebuildTower);
+twistZFolder.add(params, "twistZCurve", curveOptions).onChange(rebuildTower);
 
 const scaleFolder = gui.addFolder("Scale Gradient");
 scaleFolder.add(params, "scaleMin", 0.2, 2, 0.01).onChange(rebuildTower);

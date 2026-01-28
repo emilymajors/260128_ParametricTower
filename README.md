@@ -4,10 +4,10 @@
 
 ## Features
 - Stacked slab tower with per-floor twist and scale gradients
+- Independent twist gradients for X, Y, and Z axes
 - Smooth curve options (linear, smoothstep, ease-in-out cubic)
 - Bottom-to-top color gradient controls
 - Bend controls for curvature and direction
-- Twist axis selection (x, y, z)
 - Shape gradient morphing (square, circle, triangle)
 - Orbit camera controls and realtime updates
 
@@ -19,7 +19,7 @@
 ## Controls
 - Floors, floor height, slab size, slab thickness
 - Shape bottom/top and curve type
-- Twist min/max, axis, and curve type
+- Twist X/Y/Z min/max and curve type
 - Scale min/max and curve type
 - Bend amount, direction, and curve type
 - Top and bottom colors
